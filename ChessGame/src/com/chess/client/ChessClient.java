@@ -3,6 +3,7 @@ package com.chess.client;
 import com.chess.model.ChessBoard;
 import com.chess.model.ChessPiece;
 import com.chess.model.PieceColor;
+import com.chess.model.PieceType;
 import com.chess.network.ChessMessage;
 import com.chess.network.MessageType;
 
@@ -171,6 +172,25 @@ public class ChessClient extends JFrame {
                         });
                         break;
                         
+                    case CHECK_NOTIFICATION:
+                        PieceColor colorInCheck = message.getPlayerColor();
+                        System.out.println("[CLIENT] ⚠️ CHECK notification: " + colorInCheck);
+                        
+                        final String checkMessage = (colorInCheck == myColor) ? 
+                            "⚠️ CHECK! Your king is in danger!" : 
+                            "You put " + colorInCheck + " in CHECK!";
+                        
+                        SwingUtilities.invokeLater(new Runnable() {
+                            @Override
+                            public void run() {
+                                JOptionPane.showMessageDialog(ChessClient.this, 
+                                    checkMessage, 
+                                    "CHECK!", 
+                                    JOptionPane.WARNING_MESSAGE);
+                            }
+                        });
+                        break;
+                        
                     case GAME_OVER:
                         PieceColor winner = message.getWinner();
                         boolean iWon = (winner == myColor);
@@ -254,18 +274,60 @@ public class ChessClient extends JFrame {
 
     private void updateBoard() {
         System.out.println("[CLIENT GUI] Updating all squares...");
+        
+        // Find king positions if in check
+        int whiteKingRow = -1, whiteKingCol = -1;
+        int blackKingRow = -1, blackKingCol = -1;
+        
+        if (board.isInCheck(PieceColor.WHITE)) {
+            int[] pos = findKingPosition(PieceColor.WHITE);
+            if (pos != null) {
+                whiteKingRow = pos[0];
+                whiteKingCol = pos[1];
+            }
+        }
+        
+        if (board.isInCheck(PieceColor.BLACK)) {
+            int[] pos = findKingPosition(PieceColor.BLACK);
+            if (pos != null) {
+                blackKingRow = pos[0];
+                blackKingCol = pos[1];
+            }
+        }
+        
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
                 ChessPiece piece = board.getPiece(i, j);
                 String symbol = piece != null ? piece.getSymbol() : "";
                 boardButtons[i][j].setText(symbol);
-                boardButtons[i][j].setBorder(null);
+                
+                // Highlight king in check with red border
+                if ((i == whiteKingRow && j == whiteKingCol) || 
+                    (i == blackKingRow && j == blackKingCol)) {
+                    boardButtons[i][j].setBorder(
+                        BorderFactory.createLineBorder(Color.RED, 4));
+                } else {
+                    boardButtons[i][j].setBorder(null);
+                }
             }
         }
         selectedRow = -1;
         selectedCol = -1;
         repaint(); // Force repaint
         System.out.println("[CLIENT GUI] Board update complete");
+    }
+    
+    private int[] findKingPosition(PieceColor color) {
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                ChessPiece piece = board.getPiece(i, j);
+                if (piece != null && piece.getType() == PieceType.KING && 
+                    piece.getColor() == color) {
+                    return new int[]{i, j};
+                }
+            }
+        }
+        return null;
     }
 
     public static void main(String[] args) {
