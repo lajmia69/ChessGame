@@ -24,9 +24,9 @@ public class ChessServer {
 
     public void start() {
         System.out.println("═══════════════════════════════════════");
-        System.out.println("    ♔♕ Chess Server Started ♛♚");
-        System.out.println("    Port: " + PORT);
-        System.out.println("    Waiting for players...");
+        System.out.println("Chess Server Started ");
+        System.out.println("Port: " + PORT);
+        System.out.println("Waiting for players...");
         System.out.println("═══════════════════════════════════════");
         
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
@@ -43,16 +43,16 @@ public class ChessServer {
                     playerCount++;
                     handler.start();
                     
-                    System.out.println("[✓] Player assigned: " + color);
+                    System.out.println("Player assigned: " + color);
                     
                     if (playerCount == 2) {
                         System.out.println("\n═══════════════════════════════════════");
-                        System.out.println("    ⚔️  GAME STARTED!  ⚔️");
-                        System.out.println("    WHITE vs BLACK");
+                        System.out.println("GAME STARTED!  ");
+                        System.out.println("WHITE vs BLACK");
                         System.out.println("═══════════════════════════════════════\n");
                     }
                 } else {
-                    System.out.println("[✗] Game is full. Connection rejected.");
+                    System.out.println("Game is full. Connection rejected.");
                     clientSocket.close();
                 }
             }

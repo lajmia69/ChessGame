@@ -9,14 +9,25 @@ import com.chess.network.MessageType;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.*;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ChessClient extends JFrame {
     private static final String SERVER_HOST = "localhost";
     private static final int SERVER_PORT = 8888;
+    
+    // Chess.com style colors - tan and brown
+    private static final Color LIGHT_SQUARE = new Color(240, 217, 181); // Tan
+    private static final Color DARK_SQUARE = new Color(181, 136, 99);   // Brown
+    private static final Color SELECTED_HIGHLIGHT = new Color(246, 246, 130); // Yellow
+    private static final Color VALID_MOVE_DOT = new Color(80, 80, 80, 200); // Dark gray
+    private static final Color CHECK_HIGHLIGHT = new Color(255, 100, 100); // Bright red
+    private static final Color CHECK_BORDER = new Color(200, 0, 0); // Dark red
+    private static final Color PIECE_COLOR = new Color(50, 50, 50);
     
     private Socket socket;
     private ObjectOutputStream out;
@@ -24,77 +35,87 @@ public class ChessClient extends JFrame {
     
     private ChessBoard board;
     private PieceColor myColor;
-    private JButton[][] boardButtons;
+    private ChessSquarePanel[][] boardSquares;
     private JLabel statusLabel;
     private JLabel colorLabel;
+    private JLabel moveCountLabel;
     private int selectedRow = -1;
     private int selectedCol = -1;
+    private List<int[]> validMoves = new ArrayList<>();
 
     public ChessClient() {
         setTitle("♔ Online Chess Game ♚");
-        setSize(650, 720);
+        setSize(700, 800);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout(10, 10));
         setResizable(false);
+        getContentPane().setBackground(new Color(40, 40, 40));
 
-        // Top panel with status
-        JPanel topPanel = new JPanel(new GridLayout(2, 1));
-        topPanel.setBackground(new Color(49, 46, 43));
+        // Top panel
+        JPanel topPanel = new JPanel(new GridLayout(3, 1, 5, 5));
+        topPanel.setBackground(new Color(40, 40, 40));
+        topPanel.setBorder(BorderFactory.createEmptyBorder(15, 10, 10, 10));
         
-        colorLabel = new JLabel("Connecting...", SwingConstants.CENTER);
-        colorLabel.setFont(new Font("Arial", Font.BOLD, 18));
-        colorLabel.setForeground(Color.WHITE);
+        colorLabel = new JLabel("Connecting to server...", SwingConstants.CENTER);
+        colorLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        colorLabel.setForeground(new Color(230, 230, 230));
         topPanel.add(colorLabel);
         
-        statusLabel = new JLabel("Waiting for opponent...", SwingConstants.CENTER);
-        statusLabel.setFont(new Font("Arial", Font.PLAIN, 16));
-        statusLabel.setForeground(new Color(200, 200, 200));
+        statusLabel = new JLabel("Please wait...", SwingConstants.CENTER);
+        statusLabel.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        statusLabel.setForeground(new Color(180, 180, 180));
         topPanel.add(statusLabel);
+        
+        moveCountLabel = new JLabel("Move: 0", SwingConstants.CENTER);
+        moveCountLabel.setFont(new Font("Segoe UI", Font.ITALIC, 14));
+        moveCountLabel.setForeground(new Color(160, 160, 160));
+        topPanel.add(moveCountLabel);
         
         add(topPanel, BorderLayout.NORTH);
 
         // Chess board panel
-        JPanel boardPanel = new JPanel(new GridLayout(8, 8));
-        boardPanel.setBorder(BorderFactory.createLineBorder(new Color(49, 46, 43), 10));
-        boardButtons = new JButton[8][8];
+        JPanel boardPanel = new JPanel(new GridLayout(8, 8, 0, 0));
+        boardPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createEmptyBorder(10, 10, 10, 10),
+            BorderFactory.createLineBorder(new Color(100, 100, 100), 4)
+        ));
+        boardSquares = new ChessSquarePanel[8][8];
         
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
-                JButton button = new JButton();
-                button.setFont(new Font("Arial Unicode MS", Font.PLAIN, 48));
-                button.setPreferredSize(new Dimension(80, 80));
-                button.setFocusPainted(false);
-                button.setBorderPainted(false);
-                
-                // Chess.com style colors
-                if ((i + j) % 2 == 0) {
-                    button.setBackground(new Color(238, 238, 210)); // Light square
-                } else {
-                    button.setBackground(new Color(118, 150, 86)); // Dark square
-                }
+                Color squareColor = ((i + j) % 2 == 0) ? LIGHT_SQUARE : DARK_SQUARE;
+                ChessSquarePanel square = new ChessSquarePanel(squareColor, i, j);
                 
                 final int row = i;
                 final int col = j;
-                button.addActionListener(new ActionListener() {
+                square.addMouseListener(new MouseAdapter() {
                     @Override
-                    public void actionPerformed(ActionEvent e) {
+                    public void mouseClicked(MouseEvent e) {
                         handleSquareClick(row, col);
                     }
                 });
                 
-                boardButtons[i][j] = button;
-                boardPanel.add(button);
+                boardSquares[i][j] = square;
+                boardPanel.add(square);
             }
         }
         add(boardPanel, BorderLayout.CENTER);
 
-        // Bottom panel with instructions
-        JPanel bottomPanel = new JPanel();
-        bottomPanel.setBackground(new Color(49, 46, 43));
-        JLabel instructionLabel = new JLabel("Click a piece to select, then click destination");
-        instructionLabel.setFont(new Font("Arial", Font.ITALIC, 14));
-        instructionLabel.setForeground(new Color(180, 180, 180));
-        bottomPanel.add(instructionLabel);
+        // Bottom panel
+        JPanel bottomPanel = new JPanel(new GridLayout(2, 1));
+        bottomPanel.setBackground(new Color(40, 40, 40));
+        bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 15, 10));
+        
+        JLabel instructionLabel1 = new JLabel("Click your piece to see valid moves (gray dots)", SwingConstants.CENTER);
+        instructionLabel1.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        instructionLabel1.setForeground(new Color(150, 150, 150));
+        bottomPanel.add(instructionLabel1);
+        
+        JLabel instructionLabel2 = new JLabel("Special moves: Castling | En Passant | Pawn Promotion", SwingConstants.CENTER);
+        instructionLabel2.setFont(new Font("Segoe UI", Font.ITALIC, 12));
+        instructionLabel2.setForeground(new Color(130, 130, 130));
+        bottomPanel.add(instructionLabel2);
+        
         add(bottomPanel, BorderLayout.SOUTH);
 
         connectToServer();
@@ -102,30 +123,118 @@ public class ChessClient extends JFrame {
         setVisible(true);
     }
 
+    // Custom panel for chess squares with proper fill colors
+    class ChessSquarePanel extends JPanel {
+        private Color baseColor;
+        private Color currentColor;
+        private String pieceSymbol = "";
+        private boolean showDot = false;
+        private boolean isSelected = false;
+        private boolean isInCheck = false;
+        private int row, col;
+        
+        public ChessSquarePanel(Color color, int row, int col) {
+            this.baseColor = color;
+            this.currentColor = color;
+            this.row = row;
+            this.col = col;
+            setPreferredSize(new Dimension(85, 85));
+            setBackground(color);
+        }
+        
+        public void setPieceSymbol(String symbol) {
+            this.pieceSymbol = symbol;
+            repaint();
+        }
+        
+        public void setShowDot(boolean show) {
+            this.showDot = show;
+            repaint();
+        }
+        
+        public void setSelected(boolean selected) {
+            this.isSelected = selected;
+            this.currentColor = selected ? SELECTED_HIGHLIGHT : baseColor;
+            setBackground(currentColor);
+            repaint();
+        }
+        
+        public void setInCheck(boolean inCheck) {
+            this.isInCheck = inCheck;
+            this.currentColor = inCheck ? CHECK_HIGHLIGHT : baseColor;
+            setBackground(currentColor);
+            repaint();
+        }
+        
+        public void resetToBase() {
+            this.currentColor = baseColor;
+            this.showDot = false;
+            this.isSelected = false;
+            this.isInCheck = false;
+            setBackground(baseColor);
+            repaint();
+        }
+        
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            
+            int width = getWidth();
+            int height = getHeight();
+            
+            // Draw filled background
+            g2.setColor(currentColor);
+            g2.fillRect(0, 0, width, height);
+            
+            // Draw check border
+            if (isInCheck) {
+                g2.setColor(CHECK_BORDER);
+                g2.setStroke(new BasicStroke(5));
+                g2.drawRect(2, 2, width - 4, height - 4);
+            }
+            
+            // Draw piece symbol
+            if (!pieceSymbol.isEmpty()) {
+                g2.setColor(isInCheck ? Color.BLACK : PIECE_COLOR);
+                g2.setFont(new Font("Arial Unicode MS", isInCheck ? Font.BOLD : Font.PLAIN, isInCheck ? 56 : 50));
+                FontMetrics fm = g2.getFontMetrics();
+                int x = (width - fm.stringWidth(pieceSymbol)) / 2;
+                int y = ((height - fm.getHeight()) / 2) + fm.getAscent();
+                g2.drawString(pieceSymbol, x, y);
+            }
+            
+            // Draw valid move dot
+            if (showDot && pieceSymbol.isEmpty()) {
+                g2.setColor(VALID_MOVE_DOT);
+                int dotSize = 18;
+                g2.fillOval((width - dotSize) / 2, (height - dotSize) / 2, dotSize, dotSize);
+            }
+            
+            // Draw capture ring
+            if (showDot && !pieceSymbol.isEmpty()) {
+                g2.setColor(VALID_MOVE_DOT);
+                g2.setStroke(new BasicStroke(5));
+                g2.drawOval(5, 5, width - 10, height - 10);
+            }
+        }
+    }
+
     private void connectToServer() {
         try {
-            System.out.println("[CLIENT] Connecting to " + SERVER_HOST + ":" + SERVER_PORT);
             socket = new Socket(SERVER_HOST, SERVER_PORT);
-            System.out.println("[CLIENT] Connected! Creating streams...");
-            
             out = new ObjectOutputStream(socket.getOutputStream());
             out.flush();
             in = new ObjectInputStream(socket.getInputStream());
             
-            System.out.println("[CLIENT] Streams created. Starting receive thread...");
-            
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    receiveMessages();
-                }
-            }).start();
+            new Thread(() -> receiveMessages()).start();
         } catch (IOException e) {
-            System.err.println("[CLIENT] Connection failed: " + e.getMessage());
             JOptionPane.showMessageDialog(this, 
-                "Cannot connect to server at " + SERVER_HOST + ":" + SERVER_PORT + 
-                "\n\nMake sure the server is running!", 
-                "Connection Error", 
+                "Unable to connect to server.\n\nServer: " + SERVER_HOST + ":" + SERVER_PORT + 
+                "\n\nPlease make sure the server is running!", 
+                "Connection Failed", 
                 JOptionPane.ERROR_MESSAGE);
             System.exit(1);
         }
@@ -136,193 +245,160 @@ public class ChessClient extends JFrame {
             while (true) {
                 ChessMessage message = (ChessMessage) in.readObject();
                 
-                System.out.println("[CLIENT] Received message type: " + message.getType());
-                
                 switch (message.getType()) {
                     case PLAYER_ASSIGNED:
                         myColor = message.getPlayerColor();
-                        System.out.println("[CLIENT] Assigned color: " + myColor);
-                        colorLabel.setText("You are playing as: " + myColor + 
-                            (myColor == PieceColor.WHITE ? " ♔" : " ♚"));
+                        String colorEmoji = myColor == PieceColor.WHITE ? "♔" : "♚";
+                        colorLabel.setText("You are playing as " + myColor + " " + colorEmoji);
                         colorLabel.setForeground(myColor == PieceColor.WHITE ? 
-                            Color.WHITE : new Color(100, 100, 100));
+                            new Color(255, 255, 255) : new Color(150, 150, 150));
+                        statusLabel.setText("Waiting for opponent to join...");
                         break;
                         
                     case BOARD_UPDATE:
-                        final ChessBoard newBoard = message.getBoard();
-                        System.out.println("[CLIENT] Board update received - Move #" + 
-                                         newBoard.getMoveCount() + ", Turn: " + 
-                                         newBoard.getCurrentTurn());
-                        
-                        board = newBoard;
-                        
-                        SwingUtilities.invokeLater(new Runnable() {
-                            @Override
-                            public void run() {
-                                System.out.println("[CLIENT] Updating GUI...");
-                                updateBoard();
-                                String turnText = board.getCurrentTurn().toString();
-                                boolean isMyTurn = board.getCurrentTurn() == myColor;
-                                statusLabel.setText(turnText + "'s turn" + 
-                                    (isMyTurn ? " - YOUR MOVE!" : ""));
-                                statusLabel.setForeground(isMyTurn ? 
-                                    new Color(100, 255, 100) : new Color(200, 200, 200));
-                                System.out.println("[CLIENT] GUI updated");
+                        board = message.getBoard();
+                        SwingUtilities.invokeLater(() -> {
+                            updateBoard();
+                            moveCountLabel.setText("Move: " + board.getMoveCount());
+                            
+                            boolean isMyTurn = board.getCurrentTurn() == myColor;
+                            
+                            if (board.isInCheck(board.getCurrentTurn())) {
+                                if (isMyTurn) {
+                                    statusLabel.setText("⚠️ YOUR KING IS IN CHECK! Protect your king NOW!");
+                                    statusLabel.setForeground(CHECK_HIGHLIGHT);
+                                } else {
+                                    statusLabel.setText("Nice! Opponent's king is in check");
+                                    statusLabel.setForeground(new Color(76, 175, 80));
+                                }
+                            } else {
+                                if (isMyTurn) {
+                                    statusLabel.setText("It's your turn - Make your move!");
+                                    statusLabel.setForeground(new Color(76, 175, 80));
+                                } else {
+                                    statusLabel.setText("Opponent is thinking...");
+                                    statusLabel.setForeground(new Color(180, 180, 180));
+                                }
                             }
                         });
                         break;
                         
                     case CHECK_NOTIFICATION:
                         PieceColor colorInCheck = message.getPlayerColor();
-                        System.out.println("[CLIENT] ⚠️ CHECK notification: " + colorInCheck);
+                        String checkTitle = (colorInCheck == myColor) ? 
+                            "⚠️ CHECK - Your King is Under Attack!" : "🎯 Excellent Move!";
+                        String checkMessage = (colorInCheck == myColor) ? 
+                            "Your king is in danger!\n\nYou must:\n• Move your king to safety, OR\n• Block the attack, OR\n• Capture the attacking piece" :
+                            "You put the opponent's king in check!\n\nThey must respond to save their king.";
                         
-                        final String checkMessage = (colorInCheck == myColor) ? 
-                            "⚠️ CHECK! Your king is in danger!" : 
-                            "You put " + colorInCheck + " in CHECK!";
-                        
-                        SwingUtilities.invokeLater(new Runnable() {
-                            @Override
-                            public void run() {
-                                JOptionPane.showMessageDialog(ChessClient.this, 
-                                    checkMessage, 
-                                    "CHECK!", 
-                                    JOptionPane.WARNING_MESSAGE);
-                            }
+                        SwingUtilities.invokeLater(() -> {
+                            JOptionPane.showMessageDialog(this, checkMessage, checkTitle, 
+                                colorInCheck == myColor ? JOptionPane.WARNING_MESSAGE : JOptionPane.INFORMATION_MESSAGE);
                         });
                         break;
                         
                     case GAME_OVER:
                         PieceColor winner = message.getWinner();
                         boolean iWon = (winner == myColor);
-                        String resultText = iWon ? "🎉 YOU WIN! 🎉" : "You Lose";
-                        String fullMessage = winner + " wins!\n\n" + resultText;
+                        String gameOverTitle = iWon ? "🏆 CHECKMATE - YOU WIN! 🏆" : "Game Over - Checkmate";
+                        String gameOverMessage = iWon ? 
+                            "Congratulations!\n\nYou have defeated your opponent!\n" + winner + " wins by CHECKMATE!" :
+                            "Your opponent has won.\n\n" + winner + " wins by CHECKMATE.\n\nBetter luck next time!";
                         
-                        SwingUtilities.invokeLater(new Runnable() {
-                            @Override
-                            public void run() {
-                                JOptionPane.showMessageDialog(ChessClient.this, 
-                                    fullMessage, 
-                                    "Game Over", 
-                                    JOptionPane.INFORMATION_MESSAGE);
-                            }
+                        SwingUtilities.invokeLater(() -> {
+                            JOptionPane.showMessageDialog(this, gameOverMessage, gameOverTitle, 
+                                JOptionPane.INFORMATION_MESSAGE);
                         });
                         break;
                 }
             }
         } catch (EOFException e) {
-            System.err.println("[CLIENT] Connection closed");
             JOptionPane.showMessageDialog(this, 
-                "Connection to server lost!", 
-                "Disconnected", 
-                JOptionPane.WARNING_MESSAGE);
+                "Connection to server was lost.\n\nThe game has ended.", 
+                "Disconnected", JOptionPane.WARNING_MESSAGE);
             System.exit(0);
         } catch (Exception e) {
-            System.err.println("[CLIENT] Error receiving message: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     private void handleSquareClick(int row, int col) {
         if (board == null || board.getCurrentTurn() != myColor) {
-            if (board != null && board.getCurrentTurn() != myColor) {
-                JOptionPane.showMessageDialog(this, 
-                    "It's not your turn!", 
-                    "Wait", 
-                    JOptionPane.WARNING_MESSAGE);
+            if (selectedRow != -1) {
+                clearHighlights();
             }
+            statusLabel.setText("Please wait for your turn...");
             return;
         }
 
         if (selectedRow == -1) {
-            // Select piece
             ChessPiece piece = board.getPiece(row, col);
             if (piece != null && piece.getColor() == myColor) {
                 selectedRow = row;
                 selectedCol = col;
-                highlightSquare(row, col, true);
-                System.out.println("[CLIENT] Selected piece at (" + row + "," + col + ")");
+                boardSquares[row][col].setSelected(true);
+                
+                // Calculate valid moves
+                validMoves.clear();
+                for (int r = 0; r < 8; r++) {
+                    for (int c = 0; c < 8; c++) {
+                        if (board.isValidMove(selectedRow, selectedCol, r, c)) {
+                            validMoves.add(new int[]{r, c});
+                            boardSquares[r][c].setShowDot(true);
+                        }
+                    }
+                }
             }
         } else {
-            // Move piece
-            System.out.println("[CLIENT] Sending move from (" + selectedRow + "," + 
-                             selectedCol + ") to (" + row + "," + col + ")");
             try {
-                ChessMessage move = ChessMessage.createMoveMessage(
-                    selectedRow, selectedCol, row, col);
+                ChessMessage move = ChessMessage.createMoveMessage(selectedRow, selectedCol, row, col);
                 out.writeObject(move);
                 out.flush();
-                System.out.println("[CLIENT] Move sent to server");
             } catch (IOException e) {
-                System.err.println("[CLIENT] Error sending move: " + e.getMessage());
                 e.printStackTrace();
             }
             
-            highlightSquare(selectedRow, selectedCol, false);
-            selectedRow = -1;
-            selectedCol = -1;
+            clearHighlights();
         }
     }
 
-    private void highlightSquare(int row, int col, boolean highlight) {
-        if (highlight) {
-            boardButtons[row][col].setBorder(
-                BorderFactory.createLineBorder(new Color(255, 255, 0), 4));
-        } else {
-            boardButtons[row][col].setBorder(null);
-        }
-    }
-
-    private void updateBoard() {
-        System.out.println("[CLIENT GUI] Updating all squares...");
-        
-        // Find king positions if in check
-        int whiteKingRow = -1, whiteKingCol = -1;
-        int blackKingRow = -1, blackKingCol = -1;
-        
-        if (board.isInCheck(PieceColor.WHITE)) {
-            int[] pos = findKingPosition(PieceColor.WHITE);
-            if (pos != null) {
-                whiteKingRow = pos[0];
-                whiteKingCol = pos[1];
-            }
-        }
-        
-        if (board.isInCheck(PieceColor.BLACK)) {
-            int[] pos = findKingPosition(PieceColor.BLACK);
-            if (pos != null) {
-                blackKingRow = pos[0];
-                blackKingCol = pos[1];
-            }
-        }
-        
+    private void clearHighlights() {
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
-                ChessPiece piece = board.getPiece(i, j);
-                String symbol = piece != null ? piece.getSymbol() : "";
-                boardButtons[i][j].setText(symbol);
-                
-                // Highlight king in check with red border
-                if ((i == whiteKingRow && j == whiteKingCol) || 
-                    (i == blackKingRow && j == blackKingCol)) {
-                    boardButtons[i][j].setBorder(
-                        BorderFactory.createLineBorder(Color.RED, 4));
-                } else {
-                    boardButtons[i][j].setBorder(null);
-                }
+                boardSquares[i][j].resetToBase();
             }
         }
         selectedRow = -1;
         selectedCol = -1;
-        repaint(); // Force repaint
-        System.out.println("[CLIENT GUI] Board update complete");
+        validMoves.clear();
+    }
+
+    private void updateBoard() {
+        clearHighlights();
+        
+        // Find kings in check
+        int[] whiteKingPos = board.isInCheck(PieceColor.WHITE) ? findKingPosition(PieceColor.WHITE) : null;
+        int[] blackKingPos = board.isInCheck(PieceColor.BLACK) ? findKingPosition(PieceColor.BLACK) : null;
+        
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                ChessPiece piece = board.getPiece(i, j);
+                boardSquares[i][j].setPieceSymbol(piece != null ? piece.getSymbol() : "");
+                
+                // Highlight king in check
+                if ((whiteKingPos != null && i == whiteKingPos[0] && j == whiteKingPos[1]) ||
+                    (blackKingPos != null && i == blackKingPos[0] && j == blackKingPos[1])) {
+                    boardSquares[i][j].setInCheck(true);
+                }
+            }
+        }
     }
     
     private int[] findKingPosition(PieceColor color) {
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
                 ChessPiece piece = board.getPiece(i, j);
-                if (piece != null && piece.getType() == PieceType.KING && 
-                    piece.getColor() == color) {
+                if (piece != null && piece.getType() == PieceType.KING && piece.getColor() == color) {
                     return new int[]{i, j};
                 }
             }
@@ -331,11 +407,10 @@ public class ChessClient extends JFrame {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                new ChessClient();
-            }
-        });
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {}
+        
+        SwingUtilities.invokeLater(() -> new ChessClient());
     }
 }
