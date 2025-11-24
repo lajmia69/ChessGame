@@ -15,6 +15,7 @@ import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import javax.sound.sampled.*;
 
 public class ChessClient extends JFrame {
     private static final String SERVER_HOST = "localhost";
@@ -42,6 +43,10 @@ public class ChessClient extends JFrame {
     private int selectedRow = -1;
     private int selectedCol = -1;
     private List<int[]> validMoves = new ArrayList<>();
+    
+    // Background music
+    private Clip musicClip;
+    private boolean isMusicPlaying = false;
 
     public ChessClient() {
         setTitle("♔ Online Chess Game ♚");
@@ -118,9 +123,180 @@ public class ChessClient extends JFrame {
         
         add(bottomPanel, BorderLayout.SOUTH);
 
+        // Initialize background music
+        initializeBackgroundMusic();
+
         connectToServer();
         setLocationRelativeTo(null);
         setVisible(true);
+    }
+    
+    private void initializeBackgroundMusic() {
+        try {
+            // Try exact path first for Windows
+            File musicFile = new File("C:\\Users\\lajmi\\Downloads\\Conan.wav");
+            
+            // If not found, try using user.home
+            if (!musicFile.exists()) {
+                String userHome = System.getProperty("user.home");
+                System.out.println("[AUDIO] User home directory: " + userHome);
+                
+                String[] possiblePaths = {
+                    userHome + "\\Downloads\\Conan.wav",
+                    userHome + "/Downloads/Conan.wav",
+                    userHome + "\\Downloads\\conan.wav",
+                    userHome + "/Downloads/conan.wav"
+                };
+                
+                for (String path : possiblePaths) {
+                    File testFile = new File(path);
+                    System.out.println("[AUDIO] Trying: " + path + " - Exists: " + testFile.exists());
+                    if (testFile.exists()) {
+                        musicFile = testFile;
+                        break;
+                    }
+                }
+            }
+            
+            if (musicFile.exists()) {
+                System.out.println("[AUDIO] ✓ Found music file: " + musicFile.getAbsolutePath());
+                System.out.println("[AUDIO] File size: " + musicFile.length() + " bytes");
+                
+                // List available mixers
+                Mixer.Info[] mixerInfos = AudioSystem.getMixerInfo();
+                System.out.println("[AUDIO] Available audio mixers:");
+                for (int i = 0; i < mixerInfos.length; i++) {
+                    System.out.println("[AUDIO]   " + i + ": " + mixerInfos[i].getName());
+                }
+                
+                AudioInputStream audioStream = AudioSystem.getAudioInputStream(musicFile);
+                AudioFormat format = audioStream.getFormat();
+                System.out.println("[AUDIO] Audio format: " + format);
+                
+                // Try to get the default clip with proper mixer
+                DataLine.Info info = new DataLine.Info(Clip.class, format);
+                
+                // Prefer "Speakers" or "Primary Sound Driver"
+                boolean clipOpened = false;
+                for (Mixer.Info mixerInfo : mixerInfos) {
+                    String mixerName = mixerInfo.getName().toLowerCase();
+                    // Try speakers first, then primary sound driver
+                    if (mixerName.contains("speakers") || mixerName.contains("primary sound driver")) {
+                        try {
+                            Mixer mixer = AudioSystem.getMixer(mixerInfo);
+                            if (mixer.isLineSupported(info)) {
+                                musicClip = (Clip) mixer.getLine(info);
+                                audioStream = AudioSystem.getAudioInputStream(musicFile);
+                                musicClip.open(audioStream);
+                                System.out.println("[AUDIO] ✓✓✓ Using mixer: " + mixerInfo.getName() + " ✓✓✓");
+                                clipOpened = true;
+                                break;
+                            }
+                        } catch (Exception e) {
+                            // Try next mixer
+                        }
+                    }
+                }
+                
+                if (!clipOpened) {
+                    // Try any available mixer
+                    for (Mixer.Info mixerInfo : mixerInfos) {
+                        try {
+                            Mixer mixer = AudioSystem.getMixer(mixerInfo);
+                            if (mixer.isLineSupported(info)) {
+                                musicClip = (Clip) mixer.getLine(info);
+                                audioStream = AudioSystem.getAudioInputStream(musicFile);
+                                musicClip.open(audioStream);
+                                System.out.println("[AUDIO] ✓ Using mixer: " + mixerInfo.getName());
+                                clipOpened = true;
+                                break;
+                            }
+                        } catch (Exception e) {
+                            // Try next mixer
+                        }
+                    }
+                }
+                
+                if (!clipOpened) {
+                    // Fallback to default
+                    musicClip = AudioSystem.getClip();
+                    audioStream = AudioSystem.getAudioInputStream(musicFile);
+                    musicClip.open(audioStream);
+                    System.out.println("[AUDIO] Using default clip");
+                }
+                
+                System.out.println("[AUDIO] Clip opened successfully");
+                
+                // Try to set volume using different controls
+                boolean volumeSet = false;
+                
+                // Try MASTER_GAIN
+                if (musicClip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+                    FloatControl volume = (FloatControl) musicClip.getControl(FloatControl.Type.MASTER_GAIN);
+                    volume.setValue(volume.getMaximum());
+                    System.out.println("[AUDIO] ✓ MASTER_GAIN set to: " + volume.getValue());
+                    volumeSet = true;
+                }
+                
+                // Try VOLUME
+                if (musicClip.isControlSupported(FloatControl.Type.VOLUME)) {
+                    FloatControl volume = (FloatControl) musicClip.getControl(FloatControl.Type.VOLUME);
+                    volume.setValue(volume.getMaximum());
+                    System.out.println("[AUDIO] ✓ VOLUME set to: " + volume.getValue());
+                    volumeSet = true;
+                }
+                
+                if (!volumeSet) {
+                    System.out.println("[AUDIO] ! No volume control available - using system volume");
+                }
+                
+                // IMPORTANT: Start the clip
+                musicClip.setFramePosition(0);
+                musicClip.start();
+                musicClip.loop(Clip.LOOP_CONTINUOUSLY);
+                isMusicPlaying = true;
+                
+                System.out.println("[AUDIO] ♪♪♪ MUSIC PLAYBACK STARTED ♪♪♪");
+                System.out.println("[AUDIO] Clip state - Running: " + musicClip.isRunning() + 
+                                 ", Active: " + musicClip.isActive() + 
+                                 ", Open: " + musicClip.isOpen());
+                
+                // Monitor playback
+                new Thread(() -> {
+                    try {
+                        for (int i = 0; i < 5; i++) {
+                            Thread.sleep(1000);
+                            if (musicClip != null) {
+                                System.out.println("[AUDIO] [" + (i+1) + "s] Running: " + 
+                                                 musicClip.isRunning() + 
+                                                 " | Frame: " + musicClip.getFramePosition() + 
+                                                 "/" + musicClip.getFrameLength());
+                            }
+                        }
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }).start();
+                
+            } else {
+                System.err.println("[AUDIO] ✗ Music file NOT FOUND!");
+                System.err.println("[AUDIO] Please check that Conan.wav exists at:");
+                System.err.println("[AUDIO] C:\\Users\\lajmi\\Downloads\\Conan.wav");
+            }
+            
+        } catch (UnsupportedAudioFileException e) {
+            System.err.println("[AUDIO] ✗ Unsupported audio format: " + e.getMessage());
+            System.err.println("[AUDIO] Make sure the file is a valid WAV file.");
+        } catch (IOException e) {
+            System.err.println("[AUDIO] ✗ Error reading audio file: " + e.getMessage());
+            e.printStackTrace();
+        } catch (LineUnavailableException e) {
+            System.err.println("[AUDIO] ✗ Audio line unavailable: " + e.getMessage());
+            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println("[AUDIO] ✗ Unexpected error: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     // Custom panel for chess squares with proper fill colors
