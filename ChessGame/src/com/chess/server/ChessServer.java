@@ -64,12 +64,10 @@ public class ChessServer {
 
     public synchronized void handleClientMessage(ChessMessage message) {
         if (message.getType() == MessageType.MOVE) {
-            System.out.println("\n========================================");
             System.out.println("[SERVER] MOVE REQUEST RECEIVED");
             System.out.println("  From: (" + message.getFromRow() + "," + message.getFromCol() + ")");
             System.out.println("  To: (" + message.getToRow() + "," + message.getToCol() + ")");
             System.out.println("  Current turn: " + board.getCurrentTurn());
-            System.out.println("========================================");
             
             boolean success = board.makeMove(
                 message.getFromRow(), message.getFromCol(),
@@ -77,7 +75,7 @@ public class ChessServer {
             );
             
             if (success) {
-                System.out.println("[SERVER] ✓ MOVE VALID - Move #" + board.getMoveCount());
+                System.out.println("[SERVER] MOVE VALID - Move #" + board.getMoveCount());
                 System.out.println("[SERVER] New turn: " + board.getCurrentTurn());
                 
                 // Check for check
@@ -85,10 +83,10 @@ public class ChessServer {
                 boolean blackInCheck = board.isInCheck(PieceColor.BLACK);
                 
                 if (whiteInCheck) {
-                    System.out.println("[SERVER] ⚠️ WHITE KING IS IN CHECK!");
+                    System.out.println("[SERVER]  WHITE KING IS IN CHECK!");
                 }
                 if (blackInCheck) {
-                    System.out.println("[SERVER] ⚠️ BLACK KING IS IN CHECK!");
+                    System.out.println("[SERVER]  BLACK KING IS IN CHECK!");
                 }
                 
                 System.out.println("[SERVER] Broadcasting to " + clients.size() + " clients...");
@@ -112,7 +110,7 @@ public class ChessServer {
                     broadcast(ChessMessage.createGameOver(board.getWinner()));
                 }
             } else {
-                System.out.println("[SERVER] ✗ INVALID MOVE - Rejected\n");
+                System.out.println("[SERVER] INVALID MOVE - Rejected\n");
             }
         }
     }

@@ -441,7 +441,7 @@ public class ChessClient extends JFrame {
                             
                             if (board.isInCheck(board.getCurrentTurn())) {
                                 if (isMyTurn) {
-                                    statusLabel.setText("⚠️ YOUR KING IS IN CHECK! Protect your king NOW!");
+                                    statusLabel.setText("YOUR KING IS IN CHECK! Protect your king NOW!");
                                     statusLabel.setForeground(CHECK_HIGHLIGHT);
                                 } else {
                                     statusLabel.setText("Nice! Opponent's king is in check");
@@ -462,7 +462,7 @@ public class ChessClient extends JFrame {
                     case CHECK_NOTIFICATION:
                         PieceColor colorInCheck = message.getPlayerColor();
                         String checkTitle = (colorInCheck == myColor) ? 
-                            "⚠️ CHECK - Your King is Under Attack!" : "🎯 Excellent Move!";
+                            "⚠️ CHECK - Your King is Under Attack!" : " Excellent Move!";
                         String checkMessage = (colorInCheck == myColor) ? 
                             "Your king is in danger!\n\nYou must:\n• Move your king to safety, OR\n• Block the attack, OR\n• Capture the attacking piece" :
                             "You put the opponent's king in check!\n\nThey must respond to save their king.";
