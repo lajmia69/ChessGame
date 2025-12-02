@@ -2,6 +2,7 @@ package com.chess.network;
 
 import com.chess.model.ChessBoard;
 import com.chess.model.PieceColor;
+import com.chess.model.PieceType;
 import java.io.Serializable;
 
 public class ChessMessage implements Serializable {
@@ -13,6 +14,7 @@ public class ChessMessage implements Serializable {
     private PieceColor playerColor;
     private String chatMessage;
     private PieceColor winner;
+    private PieceType promotionType; // For pawn promotion
 
     public ChessMessage(MessageType type) {
         this.type = type;
@@ -87,5 +89,14 @@ public class ChessMessage implements Serializable {
     
     public String getChatMessage() { 
         return chatMessage; 
+    }
+    
+    public PieceType getPromotionType() {
+        return promotionType;
+    }
+    
+    // Setter for promotion type
+    public void setPromotionType(PieceType type) {
+        this.promotionType = type;
     }
 }

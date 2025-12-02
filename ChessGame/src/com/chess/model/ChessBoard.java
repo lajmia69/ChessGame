@@ -13,11 +13,9 @@ public class ChessBoard implements Serializable {
     private boolean whiteInCheck;
     private boolean blackInCheck;
     
-    // En passant tracking - tracks the PAWN that just moved
-    private int enPassantTargetCol = -1; // Column of pawn that can be captured
-    private PieceColor enPassantTargetColor = null; // Color of pawn that can be captured
+    private int enPassantTargetCol = -1;
+    private PieceColor enPassantTargetColor = null;
     
-    // Castling rights
     private boolean whiteKingMoved = false;
     private boolean whiteRookLeftMoved = false;
     private boolean whiteRookRightMoved = false;
@@ -44,7 +42,6 @@ public class ChessBoard implements Serializable {
     }
 
     private void initializeBoard() {
-        // Black pieces (row 0)
         board[0][0] = new ChessPiece(PieceType.ROOK, PieceColor.BLACK);
         board[0][1] = new ChessPiece(PieceType.KNIGHT, PieceColor.BLACK);
         board[0][2] = new ChessPiece(PieceType.BISHOP, PieceColor.BLACK);
@@ -54,12 +51,10 @@ public class ChessBoard implements Serializable {
         board[0][6] = new ChessPiece(PieceType.KNIGHT, PieceColor.BLACK);
         board[0][7] = new ChessPiece(PieceType.ROOK, PieceColor.BLACK);
         
-        // Black pawns (row 1)
         for (int i = 0; i < 8; i++) {
             board[1][i] = new ChessPiece(PieceType.PAWN, PieceColor.BLACK);
         }
 
-        // White pieces (row 7)
         board[7][0] = new ChessPiece(PieceType.ROOK, PieceColor.WHITE);
         board[7][1] = new ChessPiece(PieceType.KNIGHT, PieceColor.WHITE);
         board[7][2] = new ChessPiece(PieceType.BISHOP, PieceColor.WHITE);
@@ -69,13 +64,16 @@ public class ChessBoard implements Serializable {
         board[7][6] = new ChessPiece(PieceType.KNIGHT, PieceColor.WHITE);
         board[7][7] = new ChessPiece(PieceType.ROOK, PieceColor.WHITE);
         
-        // White pawns (row 6)
         for (int i = 0; i < 8; i++) {
             board[6][i] = new ChessPiece(PieceType.PAWN, PieceColor.WHITE);
         }
     }
 
     public boolean makeMove(int fromRow, int fromCol, int toRow, int toCol) {
+        return makeMove(fromRow, fromCol, toRow, toCol, null);
+    }
+
+    public boolean makeMove(int fromRow, int fromCol, int toRow, int toCol, PieceType promotionType) {
         if (!isValidMove(fromRow, fromCol, toRow, toCol)) {
             return false;
         }
@@ -83,13 +81,11 @@ public class ChessBoard implements Serializable {
         ChessPiece piece = board[fromRow][fromCol];
         ChessPiece capturedPiece = board[toRow][toCol];
         
-        // Clear previous en passant opportunity
         enPassantTargetCol = -1;
         enPassantTargetColor = null;
         
         // Handle en passant capture
         if (piece.getType() == PieceType.PAWN && fromCol != toCol && capturedPiece == null) {
-            // This is an en passant capture - remove the captured pawn
             int capturedPawnRow = (piece.getColor() == PieceColor.WHITE) ? toRow + 1 : toRow - 1;
             board[capturedPawnRow][toCol] = null;
             System.out.println("[BOARD] En passant capture! Removed pawn at row " + capturedPawnRow);
@@ -97,16 +93,13 @@ public class ChessBoard implements Serializable {
         
         // Handle castling
         if (piece.getType() == PieceType.KING && Math.abs(fromCol - toCol) == 2) {
-            // Kingside castling
             if (toCol == 6) {
                 ChessPiece rook = board[fromRow][7];
                 board[fromRow][5] = rook;
                 board[fromRow][7] = null;
                 rook.setMoved(true);
                 System.out.println("[BOARD] Kingside castling performed");
-            }
-            // Queenside castling
-            else if (toCol == 2) {
+            } else if (toCol == 2) {
                 ChessPiece rook = board[fromRow][0];
                 board[fromRow][3] = rook;
                 board[fromRow][0] = null;
@@ -147,13 +140,16 @@ public class ChessBoard implements Serializable {
                              " pawn at column " + enPassantTargetCol);
         }
 
-        // Pawn promotion to Queen
+        // Pawn promotion with choice
         if (piece.getType() == PieceType.PAWN) {
             if ((piece.getColor() == PieceColor.WHITE && toRow == 0) ||
                 (piece.getColor() == PieceColor.BLACK && toRow == 7)) {
-                board[toRow][toCol] = new ChessPiece(PieceType.QUEEN, piece.getColor());
+                
+                // Use specified promotion type, default to QUEEN if not specified
+                PieceType newType = (promotionType != null) ? promotionType : PieceType.QUEEN;
+                board[toRow][toCol] = new ChessPiece(newType, piece.getColor());
                 board[toRow][toCol].setMoved(true);
-                System.out.println("[BOARD] Pawn promoted to Queen!");
+                System.out.println("[BOARD] Pawn promoted to " + newType + "!");
             }
         }
 
@@ -174,7 +170,6 @@ public class ChessBoard implements Serializable {
     }
 
     public boolean isValidMove(int fromRow, int fromCol, int toRow, int toCol) {
-        // Check boundaries
         if (fromRow < 0 || fromRow > 7 || fromCol < 0 || fromCol > 7 ||
             toRow < 0 || toRow > 7 || toCol < 0 || toCol > 7) {
             return false;
@@ -190,19 +185,16 @@ public class ChessBoard implements Serializable {
             return false;
         }
 
-        // CRITICAL: If player is in check, they MUST make a move that gets them out of check
         if (isInCheck(currentTurn)) {
             if (!wouldMoveEscapeCheck(fromRow, fromCol, toRow, toCol, currentTurn)) {
                 return false;
             }
         } else {
-            // Even if not in check, cannot make a move that puts own king in check
             if (!isMoveSafeForKing(fromRow, fromCol, toRow, toCol, currentTurn)) {
                 return false;
             }
         }
 
-        // Check piece-specific movement rules
         switch (piece.getType()) {
             case PAWN:
                 return isValidPawnMove(fromRow, fromCol, toRow, toCol);
@@ -221,11 +213,9 @@ public class ChessBoard implements Serializable {
     }
     
     private boolean isMoveSafeForKing(int fromRow, int fromCol, int toRow, int toCol, PieceColor color) {
-        // Simulate the move and check if king is safe
         ChessPiece movingPiece = board[fromRow][fromCol];
         ChessPiece capturedPiece = board[toRow][toCol];
         
-        // Handle en passant simulation
         ChessPiece enPassantCaptured = null;
         if (movingPiece.getType() == PieceType.PAWN && fromCol != toCol && capturedPiece == null) {
             int capturedPawnRow = (movingPiece.getColor() == PieceColor.WHITE) ? toRow + 1 : toRow - 1;
@@ -238,11 +228,9 @@ public class ChessBoard implements Serializable {
         
         boolean kingIsSafe = !isKingInCheck(color);
         
-        // Undo the move
         board[fromRow][fromCol] = movingPiece;
         board[toRow][toCol] = capturedPiece;
         
-        // Restore en passant captured pawn
         if (enPassantCaptured != null) {
             int capturedPawnRow = (movingPiece.getColor() == PieceColor.WHITE) ? toRow + 1 : toRow - 1;
             board[capturedPawnRow][toCol] = enPassantCaptured;
@@ -255,35 +243,27 @@ public class ChessBoard implements Serializable {
         ChessPiece pawn = board[fromRow][fromCol];
         int direction = (pawn.getColor() == PieceColor.WHITE) ? -1 : 1;
         
-        // Forward move (one square)
         if (fromCol == toCol && board[toRow][toCol] == null) {
             if (toRow == fromRow + direction) {
                 return true;
             }
-            // Forward move (two squares from starting position)
             if (!pawn.hasMoved() && toRow == fromRow + 2 * direction && 
                 board[fromRow + direction][fromCol] == null) {
                 return true;
             }
         }
         
-        // Diagonal capture (regular or en passant)
         if (Math.abs(fromCol - toCol) == 1 && toRow == fromRow + direction) {
-            // Regular capture
             if (board[toRow][toCol] != null) {
                 return true;
             }
             
-            // En passant capture
-            // Check if there's an enemy pawn next to us that just moved two squares
             ChessPiece adjacentPiece = board[fromRow][toCol];
             if (adjacentPiece != null && 
                 adjacentPiece.getType() == PieceType.PAWN &&
                 adjacentPiece.getColor() != pawn.getColor() &&
                 toCol == enPassantTargetCol &&
                 adjacentPiece.getColor() == enPassantTargetColor) {
-                System.out.println("[BOARD] En passant valid: capturing " + enPassantTargetColor + 
-                                 " pawn at column " + toCol);
                 return true;
             }
         }
@@ -319,12 +299,10 @@ public class ChessBoard implements Serializable {
         int rowDiff = Math.abs(fromRow - toRow);
         int colDiff = Math.abs(fromCol - toCol);
         
-        // Regular king move (one square in any direction)
         if (rowDiff <= 1 && colDiff <= 1) {
             return true;
         }
         
-        // Castling
         if (rowDiff == 0 && colDiff == 2 && !board[fromRow][fromCol].hasMoved()) {
             return canCastle(fromRow, fromCol, toRow, toCol);
         }
@@ -335,19 +313,16 @@ public class ChessBoard implements Serializable {
     private boolean canCastle(int fromRow, int fromCol, int toRow, int toCol) {
         ChessPiece king = board[fromRow][fromCol];
         
-        // King must not have moved
         if (king.hasMoved()) {
             return false;
         }
         
-        // King must not be in check
         if (isKingInCheck(king.getColor())) {
             return false;
         }
         
         boolean isWhite = king.getColor() == PieceColor.WHITE;
         
-        // Kingside castling
         if (toCol == 6) {
             if (isWhite && whiteRookRightMoved) return false;
             if (!isWhite && blackRookRightMoved) return false;
@@ -357,12 +332,10 @@ public class ChessBoard implements Serializable {
                 return false;
             }
             
-            // Path must be clear
             if (board[fromRow][5] != null || board[fromRow][6] != null) {
                 return false;
             }
             
-            // King cannot pass through check
             if (wouldSquareBeThreatened(fromRow, 5, king.getColor()) ||
                 wouldSquareBeThreatened(fromRow, 6, king.getColor())) {
                 return false;
@@ -371,7 +344,6 @@ public class ChessBoard implements Serializable {
             return true;
         }
         
-        // Queenside castling
         if (toCol == 2) {
             if (isWhite && whiteRookLeftMoved) return false;
             if (!isWhite && blackRookLeftMoved) return false;
@@ -381,13 +353,11 @@ public class ChessBoard implements Serializable {
                 return false;
             }
             
-            // Path must be clear
             if (board[fromRow][1] != null || board[fromRow][2] != null || 
                 board[fromRow][3] != null) {
                 return false;
             }
             
-            // King cannot pass through check
             if (wouldSquareBeThreatened(fromRow, 2, king.getColor()) ||
                 wouldSquareBeThreatened(fromRow, 3, king.getColor())) {
                 return false;
@@ -472,7 +442,6 @@ public class ChessBoard implements Serializable {
         ChessPiece movingPiece = board[fromRow][fromCol];
         ChessPiece capturedPiece = board[toRow][toCol];
         
-        // Handle en passant in simulation
         ChessPiece enPassantCaptured = null;
         if (movingPiece.getType() == PieceType.PAWN && fromCol != toCol && capturedPiece == null) {
             int capturedPawnRow = (movingPiece.getColor() == PieceColor.WHITE) ? toRow + 1 : toRow - 1;
@@ -490,7 +459,6 @@ public class ChessBoard implements Serializable {
         board[fromRow][fromCol] = movingPiece;
         board[toRow][toCol] = capturedPiece;
         
-        // Restore en passant captured pawn
         if (enPassantCaptured != null) {
             int capturedPawnRow = (movingPiece.getColor() == PieceColor.WHITE) ? toRow + 1 : toRow - 1;
             board[capturedPawnRow][toCol] = enPassantCaptured;

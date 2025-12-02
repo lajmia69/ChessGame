@@ -2,6 +2,7 @@ package com.chess.server;
 
 import com.chess.model.ChessBoard;
 import com.chess.model.PieceColor;
+import com.chess.model.PieceType;
 import com.chess.network.ChessMessage;
 import com.chess.network.MessageType;
 import java.io.IOException;
@@ -69,16 +70,22 @@ public class ChessServer {
             System.out.println("  To: (" + message.getToRow() + "," + message.getToCol() + ")");
             System.out.println("  Current turn: " + board.getCurrentTurn());
             
+            // Check if this is a promotion move
+            PieceType promotionType = message.getPromotionType();
+            if (promotionType != null) {
+                System.out.println("  Promotion to: " + promotionType);
+            }
+            
             boolean success = board.makeMove(
                 message.getFromRow(), message.getFromCol(),
-                message.getToRow(), message.getToCol()
+                message.getToRow(), message.getToCol(),
+                promotionType
             );
             
             if (success) {
                 System.out.println("[SERVER] MOVE VALID - Move #" + board.getMoveCount());
                 System.out.println("[SERVER] New turn: " + board.getCurrentTurn());
                 
-                // Check for check
                 boolean whiteInCheck = board.isInCheck(PieceColor.WHITE);
                 boolean blackInCheck = board.isInCheck(PieceColor.BLACK);
                 
@@ -91,11 +98,9 @@ public class ChessServer {
                 
                 System.out.println("[SERVER] Broadcasting to " + clients.size() + " clients...");
                 
-                // IMPORTANT: Broadcast to ALL clients immediately
                 ChessMessage updateMsg = ChessMessage.createBoardUpdate(board);
                 broadcast(updateMsg);
                 
-                // Send check notification if needed
                 if (whiteInCheck) {
                     broadcast(ChessMessage.createCheckNotification(PieceColor.WHITE));
                 }

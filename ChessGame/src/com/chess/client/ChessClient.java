@@ -22,12 +22,12 @@ public class ChessClient extends JFrame {
     private static final int SERVER_PORT = 8888;
     
     // Chess.com style colors - tan and brown
-    private static final Color LIGHT_SQUARE = new Color(240, 217, 181); // Tan
-    private static final Color DARK_SQUARE = new Color(181, 136, 99);   // Brown
-    private static final Color SELECTED_HIGHLIGHT = new Color(246, 246, 130); // Yellow
-    private static final Color VALID_MOVE_DOT = new Color(80, 80, 80, 200); // Dark gray
-    private static final Color CHECK_HIGHLIGHT = new Color(255, 100, 100); // Bright red
-    private static final Color CHECK_BORDER = new Color(200, 0, 0); // Dark red
+    private static final Color LIGHT_SQUARE = new Color(240, 217, 181);
+    private static final Color DARK_SQUARE = new Color(181, 136, 99);
+    private static final Color SELECTED_HIGHLIGHT = new Color(246, 246, 130);
+    private static final Color VALID_MOVE_DOT = new Color(80, 80, 80, 200);
+    private static final Color CHECK_HIGHLIGHT = new Color(255, 100, 100);
+    private static final Color CHECK_BORDER = new Color(200, 0, 0);
     private static final Color PIECE_COLOR = new Color(50, 50, 50);
     
     private Socket socket;
@@ -40,6 +40,7 @@ public class ChessClient extends JFrame {
     private JLabel statusLabel;
     private JLabel colorLabel;
     private JLabel moveCountLabel;
+    private JButton musicToggleButton;
     private int selectedRow = -1;
     private int selectedCol = -1;
     private List<int[]> validMoves = new ArrayList<>();
@@ -47,6 +48,12 @@ public class ChessClient extends JFrame {
     // Background music
     private Clip musicClip;
     private boolean isMusicPlaying = false;
+    
+    // Pending promotion move
+    private int promotionFromRow = -1;
+    private int promotionFromCol = -1;
+    private int promotionToRow = -1;
+    private int promotionToCol = -1;
 
     public ChessClient() {
         setTitle("♔ Online Chess Game ♚");
@@ -57,7 +64,7 @@ public class ChessClient extends JFrame {
         getContentPane().setBackground(new Color(40, 40, 40));
 
         // Top panel
-        JPanel topPanel = new JPanel(new GridLayout(3, 1, 5, 5));
+        JPanel topPanel = new JPanel(new GridLayout(4, 1, 5, 5));
         topPanel.setBackground(new Color(40, 40, 40));
         topPanel.setBorder(BorderFactory.createEmptyBorder(15, 10, 10, 10));
         
@@ -73,8 +80,28 @@ public class ChessClient extends JFrame {
         
         moveCountLabel = new JLabel("Move: 0", SwingConstants.CENTER);
         moveCountLabel.setFont(new Font("Segoe UI", Font.ITALIC, 14));
-        moveCountLabel.setForeground(new Color(160, 160, 160));
+        moveCountLabel.setForeground(new Color(0, 0, 0));
         topPanel.add(moveCountLabel);
+        
+        // Music toggle button
+        musicToggleButton = new JButton("🔊 Music: ON");
+        musicToggleButton.setBackground(Color.BLACK);
+musicToggleButton.setForeground(Color.WHITE);
+
+musicToggleButton.setOpaque(true);           // force color rendering
+musicToggleButton.setBorderPainted(false);   // avoid Windows theme border
+musicToggleButton.setContentAreaFilled(true);
+musicToggleButton.setFocusPainted(false);
+musicToggleButton.setUI(new javax.swing.plaf.basic.BasicButtonUI());
+
+        musicToggleButton.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        musicToggleButton.setBackground(new Color(0, 0, 0));
+        musicToggleButton.setForeground(Color.WHITE);
+        musicToggleButton.setFocusPainted(false);
+        musicToggleButton.setBorder(BorderFactory.createEmptyBorder(8, 15, 8, 15));
+        musicToggleButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        musicToggleButton.addActionListener(e -> toggleMusic());
+        topPanel.add(musicToggleButton);
         
         add(topPanel, BorderLayout.NORTH);
 
@@ -131,16 +158,35 @@ public class ChessClient extends JFrame {
         setVisible(true);
     }
     
+private void toggleMusic() {
+    if (musicClip != null) {
+        if (isMusicPlaying) {
+            musicClip.stop();
+            isMusicPlaying = false;
+            musicToggleButton.setText("🔇 Music: OFF");
+        } else {
+            musicClip.setFramePosition(0);
+            musicClip.start();
+            musicClip.loop(Clip.LOOP_CONTINUOUSLY);
+            isMusicPlaying = true;
+            musicToggleButton.setText("🔊 Music: ON");
+        }
+
+        // FORCE COLORS ALWAYS
+        musicToggleButton.setBackground(Color.BLACK);
+        musicToggleButton.setForeground(Color.WHITE);
+        musicToggleButton.repaint();
+    }
+}
+
+
+    
     private void initializeBackgroundMusic() {
         try {
-            // Try exact path first for Windows
             File musicFile = new File("C:\\Users\\lajmi\\Downloads\\Conan.wav");
             
-            // If not found, try using user.home
             if (!musicFile.exists()) {
                 String userHome = System.getProperty("user.home");
-                System.out.println("[AUDIO] User home directory: " + userHome);
-                
                 String[] possiblePaths = {
                     userHome + "\\Downloads\\Conan.wav",
                     userHome + "/Downloads/Conan.wav",
@@ -150,7 +196,6 @@ public class ChessClient extends JFrame {
                 
                 for (String path : possiblePaths) {
                     File testFile = new File(path);
-                    System.out.println("[AUDIO] Trying: " + path + " - Exists: " + testFile.exists());
                     if (testFile.exists()) {
                         musicFile = testFile;
                         break;
@@ -160,47 +205,18 @@ public class ChessClient extends JFrame {
             
             if (musicFile.exists()) {
                 System.out.println("[AUDIO] ✓ Found music file: " + musicFile.getAbsolutePath());
-                System.out.println("[AUDIO] File size: " + musicFile.length() + " bytes");
-                
-                // List available mixers
-                Mixer.Info[] mixerInfos = AudioSystem.getMixerInfo();
-                System.out.println("[AUDIO] Available audio mixers:");
-                for (int i = 0; i < mixerInfos.length; i++) {
-                    System.out.println("[AUDIO]   " + i + ": " + mixerInfos[i].getName());
-                }
                 
                 AudioInputStream audioStream = AudioSystem.getAudioInputStream(musicFile);
                 AudioFormat format = audioStream.getFormat();
-                System.out.println("[AUDIO] Audio format: " + format);
                 
-                // Try to get the default clip with proper mixer
                 DataLine.Info info = new DataLine.Info(Clip.class, format);
                 
-                // Prefer "Speakers" or "Primary Sound Driver"
+                Mixer.Info[] mixerInfos = AudioSystem.getMixerInfo();
                 boolean clipOpened = false;
+                
                 for (Mixer.Info mixerInfo : mixerInfos) {
                     String mixerName = mixerInfo.getName().toLowerCase();
-                    // Try speakers first, then primary sound driver
                     if (mixerName.contains("speakers") || mixerName.contains("primary sound driver")) {
-                        try {
-                            Mixer mixer = AudioSystem.getMixer(mixerInfo);
-                            if (mixer.isLineSupported(info)) {
-                                musicClip = (Clip) mixer.getLine(info);
-                                audioStream = AudioSystem.getAudioInputStream(musicFile);
-                                musicClip.open(audioStream);
-                                System.out.println("[AUDIO] ✓✓✓ Using mixer: " + mixerInfo.getName() + " ✓✓✓");
-                                clipOpened = true;
-                                break;
-                            }
-                        } catch (Exception e) {
-                            // Try next mixer
-                        }
-                    }
-                }
-                
-                if (!clipOpened) {
-                    // Try any available mixer
-                    for (Mixer.Info mixerInfo : mixerInfos) {
                         try {
                             Mixer mixer = AudioSystem.getMixer(mixerInfo);
                             if (mixer.isLineSupported(info)) {
@@ -212,94 +228,43 @@ public class ChessClient extends JFrame {
                                 break;
                             }
                         } catch (Exception e) {
-                            // Try next mixer
                         }
                     }
                 }
                 
                 if (!clipOpened) {
-                    // Fallback to default
                     musicClip = AudioSystem.getClip();
                     audioStream = AudioSystem.getAudioInputStream(musicFile);
                     musicClip.open(audioStream);
-                    System.out.println("[AUDIO] Using default clip");
                 }
                 
-                System.out.println("[AUDIO] Clip opened successfully");
-                
-                // Try to set volume using different controls
-                boolean volumeSet = false;
-                
-                // Try MASTER_GAIN
                 if (musicClip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
                     FloatControl volume = (FloatControl) musicClip.getControl(FloatControl.Type.MASTER_GAIN);
                     volume.setValue(volume.getMaximum());
-                    System.out.println("[AUDIO] ✓ MASTER_GAIN set to: " + volume.getValue());
-                    volumeSet = true;
                 }
                 
-                // Try VOLUME
-                if (musicClip.isControlSupported(FloatControl.Type.VOLUME)) {
-                    FloatControl volume = (FloatControl) musicClip.getControl(FloatControl.Type.VOLUME);
-                    volume.setValue(volume.getMaximum());
-                    System.out.println("[AUDIO] ✓ VOLUME set to: " + volume.getValue());
-                    volumeSet = true;
-                }
-                
-                if (!volumeSet) {
-                    System.out.println("[AUDIO] ! No volume control available - using system volume");
-                }
-                
-                // IMPORTANT: Start the clip
                 musicClip.setFramePosition(0);
                 musicClip.start();
                 musicClip.loop(Clip.LOOP_CONTINUOUSLY);
                 isMusicPlaying = true;
                 
                 System.out.println("[AUDIO] ♪♪♪ MUSIC PLAYBACK STARTED ♪♪♪");
-                System.out.println("[AUDIO] Clip state - Running: " + musicClip.isRunning() + 
-                                 ", Active: " + musicClip.isActive() + 
-                                 ", Open: " + musicClip.isOpen());
-                
-                // Monitor playback
-                new Thread(() -> {
-                    try {
-                        for (int i = 0; i < 5; i++) {
-                            Thread.sleep(1000);
-                            if (musicClip != null) {
-                                System.out.println("[AUDIO] [" + (i+1) + "s] Running: " + 
-                                                 musicClip.isRunning() + 
-                                                 " | Frame: " + musicClip.getFramePosition() + 
-                                                 "/" + musicClip.getFrameLength());
-                            }
-                        }
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }).start();
                 
             } else {
                 System.err.println("[AUDIO] ✗ Music file NOT FOUND!");
-                System.err.println("[AUDIO] Please check that Conan.wav exists at:");
-                System.err.println("[AUDIO] C:\\Users\\lajmi\\Downloads\\Conan.wav");
+                musicToggleButton.setEnabled(false);
+                musicToggleButton.setText("🔇 No Music File");
+                musicToggleButton.setBackground(new Color(100, 100, 100));
             }
             
-        } catch (UnsupportedAudioFileException e) {
-            System.err.println("[AUDIO] ✗ Unsupported audio format: " + e.getMessage());
-            System.err.println("[AUDIO] Make sure the file is a valid WAV file.");
-        } catch (IOException e) {
-            System.err.println("[AUDIO] ✗ Error reading audio file: " + e.getMessage());
-            e.printStackTrace();
-        } catch (LineUnavailableException e) {
-            System.err.println("[AUDIO] ✗ Audio line unavailable: " + e.getMessage());
-            e.printStackTrace();
         } catch (Exception e) {
-            System.err.println("[AUDIO] ✗ Unexpected error: " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("[AUDIO] ✗ Error: " + e.getMessage());
+            musicToggleButton.setEnabled(false);
+            musicToggleButton.setText("🔇 Music Error");
+            musicToggleButton.setBackground(new Color(100, 100, 100));
         }
     }
 
-    // Custom panel for chess squares with proper fill colors
     class ChessSquarePanel extends JPanel {
         private Color baseColor;
         private Color currentColor;
@@ -361,18 +326,15 @@ public class ChessClient extends JFrame {
             int width = getWidth();
             int height = getHeight();
             
-            // Draw filled background
             g2.setColor(currentColor);
             g2.fillRect(0, 0, width, height);
             
-            // Draw check border
             if (isInCheck) {
                 g2.setColor(CHECK_BORDER);
                 g2.setStroke(new BasicStroke(5));
                 g2.drawRect(2, 2, width - 4, height - 4);
             }
             
-            // Draw piece symbol
             if (!pieceSymbol.isEmpty()) {
                 g2.setColor(isInCheck ? Color.BLACK : PIECE_COLOR);
                 g2.setFont(new Font("Arial Unicode MS", isInCheck ? Font.BOLD : Font.PLAIN, isInCheck ? 56 : 50));
@@ -382,14 +344,12 @@ public class ChessClient extends JFrame {
                 g2.drawString(pieceSymbol, x, y);
             }
             
-            // Draw valid move dot
             if (showDot && pieceSymbol.isEmpty()) {
                 g2.setColor(VALID_MOVE_DOT);
                 int dotSize = 18;
                 g2.fillOval((width - dotSize) / 2, (height - dotSize) / 2, dotSize, dotSize);
             }
             
-            // Draw capture ring
             if (showDot && !pieceSymbol.isEmpty()) {
                 g2.setColor(VALID_MOVE_DOT);
                 g2.setStroke(new BasicStroke(5));
@@ -462,7 +422,7 @@ public class ChessClient extends JFrame {
                     case CHECK_NOTIFICATION:
                         PieceColor colorInCheck = message.getPlayerColor();
                         String checkTitle = (colorInCheck == myColor) ? 
-                            "⚠️ CHECK - Your King is Under Attack!" : " Excellent Move!";
+                            "⚠️ CHECK - Your King is Under Attack!" : "✓ Excellent Move!";
                         String checkMessage = (colorInCheck == myColor) ? 
                             "Your king is in danger!\n\nYou must:\n• Move your king to safety, OR\n• Block the attack, OR\n• Capture the attacking piece" :
                             "You put the opponent's king in check!\n\nThey must respond to save their king.";
@@ -514,7 +474,6 @@ public class ChessClient extends JFrame {
                 selectedCol = col;
                 boardSquares[row][col].setSelected(true);
                 
-                // Calculate valid moves
                 validMoves.clear();
                 for (int r = 0; r < 8; r++) {
                     for (int c = 0; c < 8; c++) {
@@ -526,15 +485,78 @@ public class ChessClient extends JFrame {
                 }
             }
         } else {
-            try {
-                ChessMessage move = ChessMessage.createMoveMessage(selectedRow, selectedCol, row, col);
-                out.writeObject(move);
-                out.flush();
-            } catch (IOException e) {
-                e.printStackTrace();
+            // Check if this move would result in pawn promotion
+            ChessPiece piece = board.getPiece(selectedRow, selectedCol);
+            boolean isPromotion = false;
+            
+            if (piece != null && piece.getType() == PieceType.PAWN) {
+                if ((piece.getColor() == PieceColor.WHITE && row == 0) ||
+                    (piece.getColor() == PieceColor.BLACK && row == 7)) {
+                    isPromotion = true;
+                }
+            }
+            
+            if (isPromotion) {
+                // Store move details and show promotion dialog
+                promotionFromRow = selectedRow;
+                promotionFromCol = selectedCol;
+                promotionToRow = row;
+                promotionToCol = col;
+                showPromotionDialog();
+            } else {
+                // Regular move
+                sendMove(selectedRow, selectedCol, row, col, null);
             }
             
             clearHighlights();
+        }
+    }
+    
+    private void showPromotionDialog() {
+        JDialog dialog = new JDialog(this, "Pawn Promotion", true);
+        dialog.setLayout(new GridLayout(2, 2, 10, 10));
+        dialog.setSize(400, 300);
+        dialog.setLocationRelativeTo(this);
+        dialog.getContentPane().setBackground(new Color(40, 40, 40));
+        
+        PieceType[] promotionOptions = {PieceType.QUEEN, PieceType.ROOK, 
+                                        PieceType.BISHOP, PieceType.KNIGHT};
+        String[] symbols = {"♕", "♖", "♗", "♘"};
+        String[] names = {"Queen", "Rook", "Bishop", "Knight"};
+        
+        for (int i = 0; i < promotionOptions.length; i++) {
+            final PieceType pieceType = promotionOptions[i];
+            JButton button = new JButton("<html><center><font size='6'>" + symbols[i] + 
+                                        "</font><br>" + names[i] + "</center></html>");
+            button.setFont(new Font("Segoe UI", Font.BOLD, 16));
+            button.setBackground(new Color(60, 60, 60));
+            button.setForeground(Color.WHITE);
+            button.setFocusPainted(false);
+            button.setBorder(BorderFactory.createLineBorder(new Color(100, 100, 100), 2));
+            button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            
+            button.addActionListener(e -> {
+                sendMove(promotionFromRow, promotionFromCol, 
+                        promotionToRow, promotionToCol, pieceType);
+                dialog.dispose();
+            });
+            
+            dialog.add(button);
+        }
+        
+        dialog.setVisible(true);
+    }
+    
+    private void sendMove(int fromRow, int fromCol, int toRow, int toCol, PieceType promotion) {
+        try {
+            ChessMessage move = ChessMessage.createMoveMessage(fromRow, fromCol, toRow, toCol);
+            if (promotion != null) {
+                move.setPromotionType(promotion);
+            }
+            out.writeObject(move);
+            out.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
@@ -552,7 +574,6 @@ public class ChessClient extends JFrame {
     private void updateBoard() {
         clearHighlights();
         
-        // Find kings in check
         int[] whiteKingPos = board.isInCheck(PieceColor.WHITE) ? findKingPosition(PieceColor.WHITE) : null;
         int[] blackKingPos = board.isInCheck(PieceColor.BLACK) ? findKingPosition(PieceColor.BLACK) : null;
         
@@ -561,7 +582,6 @@ public class ChessClient extends JFrame {
                 ChessPiece piece = board.getPiece(i, j);
                 boardSquares[i][j].setPieceSymbol(piece != null ? piece.getSymbol() : "");
                 
-                // Highlight king in check
                 if ((whiteKingPos != null && i == whiteKingPos[0] && j == whiteKingPos[1]) ||
                     (blackKingPos != null && i == blackKingPos[0] && j == blackKingPos[1])) {
                     boardSquares[i][j].setInCheck(true);
