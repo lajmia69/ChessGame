@@ -514,6 +514,7 @@ private void toggleMusic() {
     
     private void showPromotionDialog() {
         JDialog dialog = new JDialog(this, "Pawn Promotion", true);
+        dialog.setUndecorated(false);
         dialog.setLayout(new GridLayout(2, 2, 10, 10));
         dialog.setSize(400, 300);
         dialog.setLocationRelativeTo(this);
@@ -528,11 +529,19 @@ private void toggleMusic() {
             final PieceType pieceType = promotionOptions[i];
             JButton button = new JButton("<html><center><font size='6'>" + symbols[i] + 
                                         "</font><br>" + names[i] + "</center></html>");
-            button.setFont(new Font("Segoe UI", Font.BOLD, 16));
-            button.setBackground(new Color(60, 60, 60));
-            button.setForeground(Color.WHITE);
-            button.setFocusPainted(false);
-            button.setBorder(BorderFactory.createLineBorder(new Color(100, 100, 100), 2));
+        button.setFont(new Font("Segoe UI", Font.BOLD, 18));
+
+button.setBackground(Color.BLACK);
+button.setForeground(Color.WHITE);
+
+button.setOpaque(true);
+button.setContentAreaFilled(true);
+button.setBorderPainted(false);
+button.setFocusPainted(false);
+button.setUI(new javax.swing.plaf.basic.BasicButtonUI());
+
+button.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
             button.setCursor(new Cursor(Cursor.HAND_CURSOR));
             
             button.addActionListener(e -> {
