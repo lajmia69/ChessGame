@@ -21,7 +21,6 @@ public class ChessClient extends JFrame {
     private static final String SERVER_HOST = "localhost";
     private static final int SERVER_PORT = 8888;
     
-    // Chess.com style colors - tan and brown
     private static final Color LIGHT_SQUARE = new Color(240, 217, 181);
     private static final Color DARK_SQUARE = new Color(181, 136, 99);
     private static final Color SELECTED_HIGHLIGHT = new Color(246, 246, 130);
@@ -45,11 +44,9 @@ public class ChessClient extends JFrame {
     private int selectedCol = -1;
     private List<int[]> validMoves = new ArrayList<>();
     
-    // Background music
     private Clip musicClip;
     private boolean isMusicPlaying = false;
     
-    // Pending promotion move
     private int promotionFromRow = -1;
     private int promotionFromCol = -1;
     private int promotionToRow = -1;
@@ -63,7 +60,6 @@ public class ChessClient extends JFrame {
         setResizable(false);
         getContentPane().setBackground(new Color(40, 40, 40));
 
-        // Top panel
         JPanel topPanel = new JPanel(new GridLayout(4, 1, 5, 5));
         topPanel.setBackground(new Color(40, 40, 40));
         topPanel.setBorder(BorderFactory.createEmptyBorder(15, 10, 10, 10));
@@ -83,13 +79,12 @@ public class ChessClient extends JFrame {
         moveCountLabel.setForeground(new Color(0, 0, 0));
         topPanel.add(moveCountLabel);
         
-        // Music toggle button
         musicToggleButton = new JButton("🔊 Music: ON");
         musicToggleButton.setBackground(Color.BLACK);
 musicToggleButton.setForeground(Color.WHITE);
 
-musicToggleButton.setOpaque(true);           // force color rendering
-musicToggleButton.setBorderPainted(false);   // avoid Windows theme border
+musicToggleButton.setOpaque(true);           
+musicToggleButton.setBorderPainted(false);   
 musicToggleButton.setContentAreaFilled(true);
 musicToggleButton.setFocusPainted(false);
 musicToggleButton.setUI(new javax.swing.plaf.basic.BasicButtonUI());
@@ -105,7 +100,6 @@ musicToggleButton.setUI(new javax.swing.plaf.basic.BasicButtonUI());
         
         add(topPanel, BorderLayout.NORTH);
 
-        // Chess board panel
         JPanel boardPanel = new JPanel(new GridLayout(8, 8, 0, 0));
         boardPanel.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createEmptyBorder(10, 10, 10, 10),
@@ -133,7 +127,6 @@ musicToggleButton.setUI(new javax.swing.plaf.basic.BasicButtonUI());
         }
         add(boardPanel, BorderLayout.CENTER);
 
-        // Bottom panel
         JPanel bottomPanel = new JPanel(new GridLayout(2, 1));
         bottomPanel.setBackground(new Color(40, 40, 40));
         bottomPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 15, 10));
@@ -150,7 +143,6 @@ musicToggleButton.setUI(new javax.swing.plaf.basic.BasicButtonUI());
         
         add(bottomPanel, BorderLayout.SOUTH);
 
-        // Initialize background music
         initializeBackgroundMusic();
 
         connectToServer();
@@ -172,7 +164,6 @@ private void toggleMusic() {
             musicToggleButton.setText("🔊 Music: ON");
         }
 
-        // FORCE COLORS ALWAYS
         musicToggleButton.setBackground(Color.BLACK);
         musicToggleButton.setForeground(Color.WHITE);
         musicToggleButton.repaint();
@@ -485,7 +476,6 @@ private void toggleMusic() {
                 }
             }
         } else {
-            // Check if this move would result in pawn promotion
             ChessPiece piece = board.getPiece(selectedRow, selectedCol);
             boolean isPromotion = false;
             
@@ -497,14 +487,12 @@ private void toggleMusic() {
             }
             
             if (isPromotion) {
-                // Store move details and show promotion dialog
                 promotionFromRow = selectedRow;
                 promotionFromCol = selectedCol;
                 promotionToRow = row;
                 promotionToCol = col;
                 showPromotionDialog();
             } else {
-                // Regular move
                 sendMove(selectedRow, selectedCol, row, col, null);
             }
             

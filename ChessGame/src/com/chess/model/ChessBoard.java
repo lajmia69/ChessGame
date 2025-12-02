@@ -84,14 +84,12 @@ public class ChessBoard implements Serializable {
         enPassantTargetCol = -1;
         enPassantTargetColor = null;
         
-        // Handle en passant capture
         if (piece.getType() == PieceType.PAWN && fromCol != toCol && capturedPiece == null) {
             int capturedPawnRow = (piece.getColor() == PieceColor.WHITE) ? toRow + 1 : toRow - 1;
             board[capturedPawnRow][toCol] = null;
             System.out.println("[BOARD] En passant capture! Removed pawn at row " + capturedPawnRow);
         }
         
-        // Handle castling
         if (piece.getType() == PieceType.KING && Math.abs(fromCol - toCol) == 2) {
             if (toCol == 6) {
                 ChessPiece rook = board[fromRow][7];
@@ -108,7 +106,6 @@ public class ChessBoard implements Serializable {
             }
         }
         
-        // Track castling rights
         if (piece.getType() == PieceType.KING) {
             if (piece.getColor() == PieceColor.WHITE) {
                 whiteKingMoved = true;
@@ -126,13 +123,11 @@ public class ChessBoard implements Serializable {
             }
         }
 
-        // Make the move
         board[toRow][toCol] = piece;
         board[fromRow][fromCol] = null;
         piece.setMoved(true);
         moveCount++;
 
-        // Set en passant opportunity if pawn moved two squares
         if (piece.getType() == PieceType.PAWN && Math.abs(fromRow - toRow) == 2) {
             enPassantTargetCol = fromCol;
             enPassantTargetColor = piece.getColor();
@@ -140,12 +135,10 @@ public class ChessBoard implements Serializable {
                              " pawn at column " + enPassantTargetCol);
         }
 
-        // Pawn promotion with choice
         if (piece.getType() == PieceType.PAWN) {
             if ((piece.getColor() == PieceColor.WHITE && toRow == 0) ||
                 (piece.getColor() == PieceColor.BLACK && toRow == 7)) {
                 
-                // Use specified promotion type, default to QUEEN if not specified
                 PieceType newType = (promotionType != null) ? promotionType : PieceType.QUEEN;
                 board[toRow][toCol] = new ChessPiece(newType, piece.getColor());
                 board[toRow][toCol].setMoved(true);
@@ -153,11 +146,9 @@ public class ChessBoard implements Serializable {
             }
         }
 
-        // Switch turns
         currentTurn = (currentTurn == PieceColor.WHITE) ? 
                       PieceColor.BLACK : PieceColor.WHITE;
 
-        // Check for check and checkmate
         whiteInCheck = isKingInCheck(PieceColor.WHITE);
         blackInCheck = isKingInCheck(PieceColor.BLACK);
         

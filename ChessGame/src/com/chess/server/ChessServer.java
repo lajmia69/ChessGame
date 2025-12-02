@@ -70,7 +70,6 @@ public class ChessServer {
             System.out.println("  To: (" + message.getToRow() + "," + message.getToCol() + ")");
             System.out.println("  Current turn: " + board.getCurrentTurn());
             
-            // Check if this is a promotion move
             PieceType promotionType = message.getPromotionType();
             if (promotionType != null) {
                 System.out.println("  Promotion to: " + promotionType);

@@ -14,7 +14,7 @@ public class ChessMessage implements Serializable {
     private PieceColor playerColor;
     private String chatMessage;
     private PieceColor winner;
-    private PieceType promotionType; // For pawn promotion
+    private PieceType promotionType;  
 
     public ChessMessage(MessageType type) {
         this.type = type;
@@ -54,7 +54,6 @@ public class ChessMessage implements Serializable {
         return msg;
     }
 
-    // Getters
     public MessageType getType() { 
         return type; 
     }
@@ -95,7 +94,6 @@ public class ChessMessage implements Serializable {
         return promotionType;
     }
     
-    // Setter for promotion type
     public void setPromotionType(PieceType type) {
         this.promotionType = type;
     }
